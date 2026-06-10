@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memorama Avanzado</title>
+
+<style>
+*{
+    box-sizing:border-box;
+}
+
+body{
+    font-family:Arial, sans-serif;
+    background:linear-gradient(135deg,#4facfe,#00f2fe);
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+}
+
+h1{
+    color:white;
+}
+
+.menu{
+    background:white;
+    padding:25px;
+    border-radius:15px;
+    text-align:center;
+    box-shadow:0 5px 15px rgba(0,0,0,.2);
+}
+
+select,button{
+    padding:10px;
+    font-size:16px;
+    margin:10px;
+}
+
+button{
+    cursor:pointer;
+    border:none;
+    background:#2563eb;
+    color:white;
+    border-radius:8px;
+}
+
+button:hover{
+    background:#1d4ed8;
+}
+
+#game{
+    display:none;
+    width:100%;
+}
+
+.info{
+    color:white;
+    font-size:1.2rem;
+    margin:15px 0;
+}
+
+.board{
+    display:grid;
+    gap:8px;
+    justify-content:center;
+}
+
+.card{
+    width:70px;
+    height:70px;
+    background:white;
+    border-radius:10px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:2rem;
+    cursor:pointer;
+    user-select:none;
+    transition:.3s;
+}
+
+.hidden{
+    background:#1f2937;
+    color:transparent;
+}
+.login-screen{
+    position:fixed;
+    inset:0;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:linear-gradient(135deg,#4facfe,#00f2fe);
+    z-index:9999;
+}
+
+.login-box{
+    background:white;
+    padding:30px;
+    border-radius:15px;
+    text-align:center;
+    box-shadow:0 5px 20px rgba(0,0,0,.25);
+    width:300px;
+}
+
+.login-box input{
+    width:100%;
+    padding:10px;
+    margin:10px 0;
+    border:1px solid #ccc;
+    border-radius:8px;
+}
+
+.login-box button{
+    width:100%;
+    padding:10px;
+}
+
+#errorMsg{
+    color:red;
+    margin-top:10px;
+    min-height:20px;
+}
+</style>
+</head>
+<body>
+<div id="loginScreen" class="login-screen">
+    <div class="login-box">
+        <h2>🔐 Acceso al Memorama</h2>
+
+        <input
+            type="password"
+            id="accessCode"
+            placeholder="Ingresa el código"
+        >
+
+        <button onclick="checkAccess()">
+            Entrar
+        </button>
+
+        <p id="errorMsg"></p>
+    </div>
+</div>
+
+<div id="mainContent" style="display:none;">
+
+</div>
+
+<h1>🧠 Memorama</h1>
+
+<div id="menu" class="menu">
+    <h2>Selecciona la dificultad</h2>
+
+    <select id="pairs">
+        <option value="8">8 parejas</option>
+        <option value="16">16 parejas</option>
+        <option value="24">24 parejas</option>
+        <option value="32">32 parejas</option>
+    </select>
+
+    <br>
+
+    <button onclick="startSelectedGame()">
+        Comenzar Juego
+    </button>
+</div>
+
+<div id="game">
+    <div class="info">
+        Movimientos:
+        <span id="moves">0</span>
+    </div>
+
+    <div class="board" id="board"></div>
+
+    <center>
+        <button onclick="showMenu()">
+            Volver al menú
+        </button>
+    </center>
+</div>
+
+<script>
+
+const emojiPool = [
+'🍎','🍌','🍇','🍉','🍒','🥝','🍍','🍓',
+'🥥','🍋','🍑','🥭','🍐','🍊','🍈','🍏',
+'🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼',
+'🐨','🐯','🦁','🐮','🐸','🐵','🐔','🐧'
+];
+
+let firstCard=null;
+let secondCard=null;
+let lockBoard=false;
+let moves=0;
+let matches=0;
+let totalPairs=8;
+
+const board=document.getElementById("board");
+const movesText=document.getElementById("moves");
+
+function shuffle(array){
+    for(let i=array.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [array[i],array[j]]=[array[j],array[i]];
+    }
+}
+
+function startSelectedGame(){
+
+    totalPairs=parseInt(
+        document.getElementById("pairs").value
+    );
+
+    document.getElementById("menu").style.display="none";
+    document.getElementById("game").style.display="block";
+
+    createGame(totalPairs);
+}
+
+function createGame(pairCount){
+
+    board.innerHTML="";
+    moves=0;
+    matches=0;
+
+    movesText.textContent="0";
+
+    let selected = emojiPool.slice(0,pairCount);
+
+    let cards=[...selected,...selected];
+
+    shuffle(cards);
+
+    let cols=Math.ceil(Math.sqrt(cards.length));
+
+    board.style.gridTemplateColumns=
+        `repeat(${cols},70px)`;
+
+    cards.forEach(emoji=>{
+
+        const card=document.createElement("div");
+
+        card.className="card hidden";
+        card.dataset.value=emoji;
+        card.textContent=emoji;
+
+        card.addEventListener("click",flipCard);
+
+        board.appendChild(card);
+    });
+}
+
+function flipCard(){
+
+    if(lockBoard) return;
+    if(this===firstCard) return;
+    if(!this.classList.contains("hidden")) return;
+
+    this.classList.remove("hidden");
+
+    if(!firstCard){
+        firstCard=this;
+        return;
+    }
+
+    secondCard=this;
+
+    moves++;
+    movesText.textContent=moves;
+
+    checkMatch();
+}
+
+function checkMatch(){
+
+    if(
+        firstCard.dataset.value===
+        secondCard.dataset.value
+    ){
+
+        matches++;
+
+        firstCard.removeEventListener(
+            "click",
+            flipCard
+        );
+
+        secondCard.removeEventListener(
+            "click",
+            flipCard
+        );
+
+        resetTurn();
+
+        if(matches===totalPairs){
+
+            setTimeout(()=>{
+
+                alert(
+                    `🎉 ¡Ganaste!\nMovimientos: ${moves}`
+                );
+
+            },300);
+        }
+
+    }else{
+
+        lockBoard=true;
+
+        setTimeout(()=>{
+
+            firstCard.classList.add("hidden");
+            secondCard.classList.add("hidden");
+
+            resetTurn();
+
+        },800);
+    }
+}
+
+function resetTurn(){
+    firstCard=null;
+    secondCard=null;
+    lockBoard=false;
+}
+
+function showMenu(){
+
+    document.getElementById("game").style.display="none";
+    document.getElementById("menu").style.display="block";
+
+    board.innerHTML="";
+}
+let attempts = 0;
+
+function checkAccess(){
+
+    const code = document
+        .getElementById("accessCode")
+        .value
+        .trim()
+        .toLowerCase();
+
+    if(code === "gera"){
+
+        document.getElementById("loginScreen")
+            .style.display = "none";
+
+        document.getElementById("mainContent")
+            .style.display = "block";
+
+    }else{
+
+        attempts++;
+
+        if(attempts >= 3){
+
+            document.getElementById("errorMsg")
+                .innerHTML =
+                "❌ Código incorrecto.<br><br>" +
+                "💡 Pista: la contraseña es <b>gera</b>";
+
+        }else{
+
+            document.getElementById("errorMsg")
+                .textContent =
+                `❌ Código incorrecto. Intento ${attempts}/3`;
+        }
+    }
+}
+</script>
+
+</body>
+</html>
